@@ -12,6 +12,7 @@
 #include "linuxrec.h"
 #include <json/json.h>
 #include "TTS.h"
+#include "audioplay.h"
 
 using namespace std;
 
@@ -40,7 +41,7 @@ class IAT
 				"result_type = plain, result_encoding = utf8";	
 			WAVEFORMATEX wavfmt = DEFAULT_FORMAT;
 
-			MSPLogin(NULL, NULL, "appid = 596584e7");
+			MSPLogin(NULL, NULL, "appid = 5965787c, work_dir = .");
 
 			iat.ep_stat = MSP_EP_LOOKING_FOR_SPEECH;
 			iat.rec_stat = MSP_REC_STATUS_SUCCESS;
@@ -61,25 +62,24 @@ class IAT
 
 			cout<<"请说话："<<endl;
 
-			sleep(10);
+			sleep(5);
 
 			if (iat.nullflag == 0)
 			{
-				cout<<"小灰灰：你在说什么？"<<endl;
-				TTS::ttsFunc("你在说什么？");
 				stop_record(iat.recorder);
+				while(!is_record_stopped(iat.recorder));
+
+				cout<<"小灰灰：你在说什么？"<<endl;
+				TTS::ttsFunc("你在说什么？");	
+
 			}
+			usleep (audioLength*1000);	
 
-
-			while((!is_record_stopped(iat.recorder)));
-
-			QISRSessionEnd(session_begin_params,"normal");
-
-			close_recorder(iat.recorder);
-
-			destroy_recorder(iat.recorder);
-							
+			QISRSessionEnd(session_begin_params,"normal");					
 			MSPLogout();
+			close_recorder(iat.recorder);
+			destroy_recorder(iat.recorder);
+
 
 		}
 
@@ -92,14 +92,13 @@ class IAT
 			if(len == 0 || data == NULL)
 				return;
 
-			// sr = (struct speech_rec *)user_para;
 
 			if(sr == NULL || sr->ep_stat >= MSP_EP_AFTER_SPEECH)
 				return;
 			
 			ret = QISRAudioWrite(sr->session_id, data, len, sr->audio_status, &sr->ep_stat, &sr->rec_stat);
 			if(ret!=MSP_SUCCESS){printf("写入失败\n");}
-			// else{printf("成功6\n");}
+
 
 			sr->audio_status = MSP_AUDIO_SAMPLE_CONTINUE;
 
@@ -109,6 +108,11 @@ class IAT
 				if (MSP_SUCCESS != ret){printf("获取失败\n");}
 				else
 				{
+					stop_record(sr->recorder);
+					while(!is_record_stopped(sr->recorder));
+
+					sr->nullflag = 1;
+
 					Json::Reader  reader ;
 					Json::Value     value  ;
 
@@ -123,33 +127,27 @@ class IAT
 					
 					postData="key=84779b356eb9497d92ada64a70a3fb64&info="+infoMSG;
 					char* postDataPoint  = &postData[0];
-					// postDataPoint = &postData[0];
+
 					if(tur.HttpPost("http://www.tuling123.com/openapi/api", postDataPoint,str))
 					{
 						char* strPort = strchr(str, '{');
 						if(reader.parse(strPort,value))
 						{
+
 							cout<<"小灰灰："<<value["text"].asString()<<endl;
 							TTS::ttsFunc(&value["text"].asString()[0]);
+
 							free(str);
 						}
 
 					} 
 
-					stop_record(sr->recorder);
-					sr->nullflag = 1;
-
-
 				}
+				
 			}
+
 		}	
-
 		struct speech_rec iat;
-
-	private:
-
-
-
 };
 
 #endif

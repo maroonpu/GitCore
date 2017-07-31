@@ -16,15 +16,16 @@ else
 LDFLAGS := -L$(DIR_LIB)/x86 
 endif
 
-LDFLAGS += -lmsc -lrt -ldl -lpthread -lasound
+LDFLAGS += -lmsc -lrt -ldl -lpthread -lasound -lvlc
 
 OBJECTS := $(patsubst %.cpp %.c,%.o,$(wildcard *.cpp *.c))
 
 $(BIN_TARGET) : $(OBJECTS)
-	$(CROSS_COMPILE)g++ $(CFLAGS) $^ -lalut -lopenal -o $@ $(LDFLAGS) $(LIB)
-
+	# $(CROSS_COMPILE)g++ $(CFLAGS) $^ -lalut -lopenal -o $@ $(LDFLAGS) $(LIB)
+	$(CROSS_COMPILE)g++ $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIB)
 %.o : %.cpp %.c
-	$(CROSS_COMPILE)g++ -c $(CFLAGS) $< -lalut -lopenal -o $@
+	# $(CROSS_COMPILE)g++ -c $(CFLAGS) $< -lalut -lopenal -o $@
+	$(CROSS_COMPILE)g++ -c $(CFLAGS) $< -o $@
 clean:
 	@rm -f *.o $(BIN_TARGET)
 

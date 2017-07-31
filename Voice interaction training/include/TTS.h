@@ -7,8 +7,9 @@
 #include "qtts.h"
 #include "msp_cmn.h"
 #include "msp_errors.h"
-#include <AL/al.h> 
-#include <AL/alc.h> 
+// #include <AL/al.h> 
+// #include <AL/alc.h> 
+#include "audioplay.h"
 
 using namespace std;
 
@@ -49,6 +50,7 @@ wave_pcm_hdr default_wav_hdr =
 	{'d', 'a', 't', 'a'},
 	0  
 };
+
 class TTS
 {
 	public:
@@ -58,94 +60,45 @@ class TTS
 			const char* session_begin_params = "voice_name = nannan, text_encoding = utf8, sample_rate = 16000, speed = 50, volume = 50, pitch = 50, rdn = 2";	
 			const char* sessionID = QTTSSessionBegin(session_begin_params, &ret);
 			if(ret != MSP_SUCCESS){cout<<"开始合成失败"<<endl;}
-			// else cout<<"开始语音合成"<<endl;
 
-			// const char* audio_text = "亲爱的用户，您好，这是一个语音合成示例，感谢您对科大讯飞语音技术的支持！科大讯飞是亚太地区最大的语音上市公司，股票代码：002230";
 			if(strlen(audio_text)>8192) audio_text="小灰灰说不了那么多话！";
 			ret = QTTSTextPut(sessionID,audio_text,strlen(audio_text),NULL);	
 			if(ret != MSP_SUCCESS){cout<<"写入文本失败"<<endl;}
-			// else cout<<"成功写入文本"<<endl;
 
-			// wave_pcm_hdr wav_hdr = default_wav_hdr;
+			wave_pcm_hdr wav_hdr = default_wav_hdr;
 			int synth_status;
 			unsigned int audio_len;
 			FILE* fp = fopen("demo.wav", "wb");
 
-			// fwrite(&wav_hdr, sizeof(wav_hdr), 1, fp);
+			fwrite(&wav_hdr, sizeof(wav_hdr), 1, fp);
 			while(1)
 			{
 				const void* data = QTTSAudioGet(sessionID, &audio_len, &synth_status, &ret);
 				if(data != NULL)
 				{
-
-					// const ALCchar *   devices; 
-					ALCdevice *       mainDev; 
-					ALCcontext *      mainContext; 
-					ALuint            buffer; 
-					ALuint            source; 
-					ALint             playState; 			
-
-					// printf("Opening playback device:\n"); 
-					mainDev = alcOpenDevice(NULL); 
-					if (mainDev == NULL) 
-					{ 
-					  // printf("Unable to open playback device!\n"); 
-					  exit(1); 
-					} 
-					alcGetString(mainDev, ALC_DEVICE_SPECIFIER); 
-					// printf("   opened device '%s'\n", devices); 
-					mainContext = alcCreateContext(mainDev, NULL); 
-					if (mainContext == NULL) 
-					{ 
-					  // printf("Unable to create playback context!\n"); 
-					  exit(1); 
-					} 
-					// printf("   created playback context\n"); 
-
-					// Make the playback context current 使回放上下文当前
-					alcMakeContextCurrent(mainContext); 
-					alcProcessContext(mainContext); 
-
-					alGenBuffers(1, &buffer); 
-					alGenSources(1, &source); 
-					alBufferData(buffer, AL_FORMAT_STEREO16, data, audio_len, 8000); 
-					alSourcei(source, AL_BUFFER, buffer); 
-					alSourcePlay(source); 
-
-					// Wait for the source to stop playing 
-					playState = AL_PLAYING; 
-					while (playState == AL_PLAYING) 
-					{ 
-					  // printf("  source %d is playing...\r", source); 
-					  fflush(stdout); 
-					  // alGetSourcei(source, AL_SOURCE_STATE, &playState); 
-					  usleep(100000); 
-					} 
-					// printf("\nDone with playback.\n"); 
-					fflush(stdout); 
-
-					// Shut down OpenAL 
-					alDeleteSources(1, &source); 
-					alDeleteBuffers(1, &buffer); 
-
-					alcMakeContextCurrent(NULL); 
-					alcCloseDevice(mainDev); 
-
-					// fwrite(data, audio_len, 1, fp);
-					// wav_hdr.data_size += audio_len;
+					fwrite(data, audio_len, 1, fp);
 				}
 				if(synth_status == MSP_TTS_FLAG_DATA_END || ret != MSP_SUCCESS)
 				{
 					break;
 				}
 			}
-
+			/* 修正wav文件头数据的大小 */
+			wav_hdr.size_8 += wav_hdr.data_size + (sizeof(wav_hdr) - 8);
+			
+			/* 将修正过的数据写回文件头部,音频文件为wav格式 */
+			fseek(fp, 4, 0);
+			fwrite(&wav_hdr.size_8,sizeof(wav_hdr.size_8), 1, fp); //写入size_8的值
+			fseek(fp, 40, 0); //将文件指针偏移到存储data_size值的位置
+			fwrite(&wav_hdr.data_size,sizeof(wav_hdr.data_size), 1, fp); //写入data_size的值
 			fclose(fp);
 			fp = NULL;
+			
+			AudioPlay AP;
+    			AP.playAudio("demo.wav");
 
 			ret = QTTSSessionEnd(sessionID, "normal end");
 			if(ret != MSP_SUCCESS){cout<<"结束语音合成失败"<<endl;}
-			// else cout<<"结束语音合成"<<endl;			
 		}
 	
 };
