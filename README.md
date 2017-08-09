@@ -1,1 +1,1 @@
-# core
+This repository is for release.
