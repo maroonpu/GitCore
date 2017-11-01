@@ -12,15 +12,17 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
-
+/****************PID_CHECK*********************/
 #define PROC_DIRECTORY "/proc/"
 #define CASE_SENSITIVE    1
 #define CASE_INSENSITIVE  0
 #define EXACT_MATCH       1
 #define INEXACT_MATCH     0
 
-
+/******************GPIO***********************/
 #define MMAP_PATH   "/dev/mem"
+
+#define DETECT_PIN              14  //Detecting Pin is GPIO14 
 
 #define RALINK_GPIO_DIR_IN      0
 #define RALINK_GPIO_DIR_OUT     1
@@ -53,8 +55,12 @@
 #define RALINK_REG_PIO9564RESET     0x648
 
 
+
 static uint8_t* gpio_mmap_reg = NULL;
 static int gpio_mmap_fd = 0;
+
+
+/******************GPIO***********************/
 
 static int gpio_mmap(void)
 {
@@ -96,7 +102,8 @@ int mt76x8_gpio_get_pin(int pin)
 
 }
 
-//是不是数字
+/****************PID_CHECK*********************/
+//is number?
 int IsNumeric(const char* ccharptr_CharacterList)
 {
     for ( ; *ccharptr_CharacterList; ccharptr_CharacterList++)
@@ -105,7 +112,7 @@ int IsNumeric(const char* ccharptr_CharacterList)
     return 1; // true
 }
 
-//intCaseSensitive=0大小写不敏感
+//intCaseSensitive=0 大小写不敏感
 int strcmp_Wrapper(const char *s1, const char *s2, int intCaseSensitive)
 {
     if (intCaseSensitive)
@@ -114,7 +121,7 @@ int strcmp_Wrapper(const char *s1, const char *s2, int intCaseSensitive)
         return !strcasecmp(s1, s2);
 }
 
-//intCaseSensitive=0大小写不敏感
+//intCaseSensitive=0 大小写不敏感
 int strstr_Wrapper(const char* haystack, const char* needle, int intCaseSensitive)
 {
     if (intCaseSensitive)
@@ -168,11 +175,6 @@ pid_t GetPIDbyName_implements(const char* cchrptr_ProcessName, int intCaseSensit
                     else
                         chrptr_StringToCompare = chrarry_NameOfProcess ;
 
-                    //printf("Process name: %s\n", chrarry_NameOfProcess);
-                    //这个是全路径，比如/bin/ls
-                    //printf("Pure Process name: %s\n", chrptr_StringToCompare );
-                    //这个是纯进程名，比如ls
-
                     //这里可以比较全路径名，设置为chrarry_NameOfProcess即可
                     if ( CompareFunction(chrptr_StringToCompare, cchrptr_ProcessName, intCaseSensitiveness) )
                     {
@@ -188,63 +190,50 @@ pid_t GetPIDbyName_implements(const char* cchrptr_ProcessName, int intCaseSensit
     return pid_ProcessIdentifier ;
 }
 
-//简单实现
+
 pid_t GetPIDbyName_Wrapper(const char* cchrptr_ProcessName)
 {
         return GetPIDbyName_implements(cchrptr_ProcessName, 0,0);//大小写不敏感
 }
 
+
+/******************MAIN************************/
 int main(int argc, char **argv)
 {
-    // int counter = 0,counterTmp = 0;
 
     if (gpio_mmap())
         return -1;
 
+    //create parent & child process
     pid_t childPid = fork();
-
 
     if(childPid != 0)
     {   
-        //parent
+        //parent process
         while(1)
         {
-            if(!mt76x8_gpio_get_pin(14))
+            //pull out
+            if(!mt76x8_gpio_get_pin(DETECT_PIN))
             {
                 if(GetPIDbyName_Wrapper("arecord") != -1)
                 {
                     kill(GetPIDbyName_Wrapper("arecord"),SIGKILL);
                     kill(GetPIDbyName_Wrapper("aplay"),SIGKILL);
                 }
-
-                // while(1)
-                // {
-                //     if(mt76x8_gpio_get_pin(14))
-                //     {
-                //         counter++;
-                //         break;
-                //     }
-                // }
-                                
             }
-            // //pull out
-            // if(!mt76x8_gpio_get_pin(14))
-            //     kill(childPid+2*(counter+1),SIGKILL);
 
         }
     }   
     else
     {  
-        //child
+        //child process
         while(1)
         {
-            // printf("child:%d\n",counter);
-            // sleep(1);
             // //insert
-            if(mt76x8_gpio_get_pin(14))
+            if(mt76x8_gpio_get_pin(DETECT_PIN))
             {
                 system("arecord -c 2 -r 16000 | aplay -c 2 -r 16000");
-                while(mt76x8_gpio_get_pin(14));
+                while(mt76x8_gpio_get_pin(DETECT_PIN));
             }
         }
     } 
